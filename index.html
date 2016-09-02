@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Android.flowlayout by nightynight</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Android.flowlayout</h1>
+      <h2 class="project-tagline"></h2>
+      <a href="https://github.com/nightynight/Android.FlowLayout" class="btn">View on GitHub</a>
+      <a href="https://github.com/nightynight/Android.FlowLayout/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/nightynight/Android.FlowLayout/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <p>创建一个类继承ViewGroup：</p>
+
+<pre><code>public class FlowLayout extends ViewGroup {
+    public FlowLayout(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
+        //如果有自定义属性，在构造函数中获取
+        // 由于我们的自定义流布局控件没有自定义属性，所以不需要获得我自定义的样式属性
+    }
+    public FlowLayout(Context context, AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+    public FlowLayout(Context context) {
+        this(context, null);
+    }
+    @Override
+    /**
+     * 设置FlowLayout的宽和高
+     * 如果给的值是具体的多少dp，就直接获取宽高
+     * 如果是wrap_content，则宽就铺满，高需要计算
+     */
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int sizeWidth = MeasureSpec.getSize(widthMeasureSpec);
+        int modeWidth = MeasureSpec.getMode(widthMeasureSpec);
+        int sizeHeight = MeasureSpec.getSize(heightMeasureSpec);
+        int modeHeight = MeasureSpec.getMode(heightMeasureSpec);
+        int width = 0;//FlowLayout的宽
+        int height = 0;//FlowLayout的高
+        // 记录每一行的宽度与高度
+        int lineWidth = 0;
+        int lineHeight = 0;
+        // 得到内部元素的个数
+        int cCount = getChildCount();
+        for (int i = 0; i &lt; cCount; i++) {
+            View child = getChildAt(i);
+            // 测量子View的宽和高
+            measureChild(child, widthMeasureSpec, heightMeasureSpec);
+            // 得到LayoutParams
+            MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();//通过lp可以拿到子控件的margin属性
+            // 子View占据的宽度
+            int childWidth = child.getMeasuredWidth() + lp.leftMargin + lp.rightMargin;
+            // 子View占据的高度
+            int childHeight = child.getMeasuredHeight() + lp.topMargin + lp.bottomMargin;
+            // 当前行还可以放下这个子View，则不换行
+            if (lineWidth + childWidth &lt;= sizeWidth - getPaddingLeft() - getPaddingRight()) {
+                // 叠加行宽
+                lineWidth += childWidth;
+                // 得到当前行子View的最大高度
+                lineHeight = Math.max(lineHeight, childHeight);
+            } else {// 换行
+                // 对比得到最大的宽度
+                width = Math.max(width, lineWidth);
+                //叠加高度
+                height += lineHeight;
+                // 重置新行的行宽
+                lineWidth = childWidth;
+                // 重置新行的行高
+                lineHeight = childHeight;
+            }
+            // 最后一个控件
+            if (i == cCount - 1) {
+                width = Math.max(lineWidth, width);
+                height += lineHeight;
+            }
+        }
+        setMeasuredDimension(
+            modeWidth == MeasureSpec.EXACTLY ? sizeWidth : width + getPaddingLeft() + getPaddingRight(),
+            modeHeight == MeasureSpec.EXACTLY ? sizeHeight : height + getPaddingTop()+ getPaddingBottom()
+        );
+    }
+    //存储所有的View
+    private List&lt;List&lt;View&gt;&gt; mAllViews = new ArrayList&lt;List&lt;View&gt;&gt;();
+    //每一行的高度
+    private List&lt;Integer&gt; mLineHeight = new ArrayList&lt;Integer&gt;();
+    @Override
+    /**
+     * 设置View如何显示，分为两步
+     *  1.先得到所有的View（即每一行行多少个子View，有多少行）和每一行的行高
+     *  2.设置子View的位置
+     */
+    protected void onLayout(boolean changed, int l, int t, int r, int b)
+    {
+        mAllViews.clear();
+        mLineHeight.clear();
+        int width = getWidth();// 当前FlowLayout的宽度
+        //1.先得到所有的View（即每一行行多少个子View，有多少行）和每一行的行高
+        int lineWidth = 0;
+        int lineHeight = 0;
+        List&lt;View&gt; lineViews = new ArrayList&lt;View&gt;();
+        int cCount = getChildCount();
+        for (int i = 0; i &lt; cCount; i++) {
+            View child = getChildAt(i);
+            MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
+            int childWidth = child.getMeasuredWidth();
+            int childHeight = child.getMeasuredHeight();
+            // 如果需要换行
+            if (childWidth + lineWidth + lp.leftMargin + lp.rightMargin &gt; width - getPaddingLeft() - getPaddingRight()) {
+                // 记录LineHeight
+                mLineHeight.add(lineHeight);
+                // 记录当前行的Views
+                mAllViews.add(lineViews);
+                // 重置我们的行宽和行高
+                lineWidth = 0;
+                lineHeight = childHeight + lp.topMargin + lp.bottomMargin;
+                // 重置我们的View集合
+                lineViews = new ArrayList&lt;View&gt;();
+            }
+            lineWidth += childWidth + lp.leftMargin + lp.rightMargin;
+            lineHeight = Math.max(lineHeight, childHeight + lp.topMargin + lp.bottomMargin);
+            lineViews.add(child);
+        }// for end
+        // 处理最后一行
+        mLineHeight.add(lineHeight);
+        mAllViews.add(lineViews);
+        // 2.设置子View的位置
+        int left = getPaddingLeft();
+        int top = getPaddingTop();
+        // 行数
+        int lineNum = mAllViews.size();
+        for (int i = 0; i &lt; lineNum; i++) {
+            lineViews = mAllViews.get(i);// 当前行的所有的View
+            lineHeight = mLineHeight.get(i);//当前行的行高
+            //显示每一行
+            for (int j = 0; j &lt; lineViews.size(); j++) {
+                View child = lineViews.get(j);
+                // 判断child的状态，如果子View的Visibility为GONE，则不显示
+                if (child.getVisibility() == View.GONE) {
+                    continue;
+                }
+                MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
+                //获取子View的位置坐标（相对父控件的位置）
+                int lc = left + lp.leftMargin;
+                int tc = top + lp.topMargin;
+                int rc = lc + child.getMeasuredWidth();
+                int bc = tc + child.getMeasuredHeight();
+                // 为子View进行布局
+                child.layout(lc, tc, rc, bc);
+                left += child.getMeasuredWidth() + lp.leftMargin + lp.rightMargin;//下一个子View显示在该子View的右边
+            }
+            //一行显示完后,换行，回到最左边
+            top += lineHeight ;
+            left = getPaddingLeft() ;
+        }
+    }
+    /**
+     * 与当前ViewGroup对应的LayoutParams
+     */
+    @Override
+    public LayoutParams generateLayoutParams(AttributeSet attrs) {
+        return new MarginLayoutParams(getContext(), attrs);
+    }
+}
+</code></pre>
+
+<p>如何使用我们自定义的FlowLayout？直接在布局文件中加入FlowLayout：</p>
+
+<pre><code>&lt;com.brokepal.flowlayout.view.FlowLayout
+    android:padding="20dp"
+    android:id="@+id/id_flowlayout"
+    android:background="#E5E5F5"
+    android:layout_width="300dp"
+    android:layout_height="wrap_content" &gt;
+&lt;/com.brokepal.flowlayout.view.FlowLayout&gt;
+</code></pre>
+
+<p>在FlowLayout中加入子控件或是在Activity中动态加入控件。下面演示一下第二种方法：</p>
+
+<pre><code>@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+    initData();
+}
+public void initData() {
+    String[] mVals = new String[]
+            {
+                    "Hello", "Android", "Weclome Hi ", "Button", "TextView", "Hello",
+                    "Android", "Weclome", "Button ImageView", "TextView", "Helloworld",
+                    "Android", "Weclome Hello", "Button Text", "TextView"
+            };
+    LayoutInflater mInflater = LayoutInflater.from(this);
+    FlowLayout mFlowLayout = (FlowLayout) findViewById(R.id.id_flowlayout);
+    for (int i = 0; i &lt; mVals.length; i++)
+    {
+        TextView tv = (TextView) mInflater.inflate(R.layout.tv, mFlowLayout, false);
+        tv.setText(mVals[i]);
+        mFlowLayout.addView(tv);
+    }
+}
+</code></pre>
+
+<p>下面是每个TextView的布局文件tv.xml：</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="5dp"
+    android:background="@drawable/tv_bg"
+    android:textColor="#5BC4ED"
+    android:text="Helloworld" &gt;
+&lt;/TextView&gt;
+</code></pre>
+
+<p>背景配置文件tv_bg.xml：</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;shape xmlns:android="http://schemas.android.com/apk/res/android" &gt;
+    &lt;solid android:color="#ffffff" /&gt;
+    &lt;corners android:radius="30dp" /&gt;
+    &lt;padding
+        android:bottom="2dp"
+        android:left="10dp"
+        android:right="10dp"
+        android:top="2dp" /&gt;
+&lt;/shape&gt;
+</code></pre>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/nightynight/Android.FlowLayout">Android.flowlayout</a> is maintained by <a href="https://github.com/nightynight">nightynight</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
